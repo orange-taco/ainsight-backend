@@ -1,0 +1,14 @@
+# Web Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Data Validation
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# Dependency Injection
+dependency-injector==4.42.0
+
+# Database - MongoDB
+motor==3.6.0
+pymongo==4.9.1
