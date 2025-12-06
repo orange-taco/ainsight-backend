@@ -7,6 +7,7 @@ services:
       dockerfile: docker/web.Dockerfile
       args:
         - DEV=true
+    init: true
     container_name: web-service
     restart: no
     env_file:
@@ -16,7 +17,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy 
 
   mongo:
     image: mongo:7
@@ -28,6 +30,12 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 
 volumes:
   mongo-dev-data:
