@@ -10,7 +10,6 @@ router = APIRouter(prefix="/health", tags=["Health"])
 @router.get("/")
 @inject
 async def health_check(client=Provide[AppContainer.mongo_client]):
-    # 실제 MongoDB ping 테스트
     try:
         await client.admin.command("ping")
         mongo_status = "connected"

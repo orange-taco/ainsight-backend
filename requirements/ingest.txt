@@ -1,0 +1,5 @@
+# Reddit API
+asyncpraw>=7.7
+
+# optional
+tenacity>=8.2

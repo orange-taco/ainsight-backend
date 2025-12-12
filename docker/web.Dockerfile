@@ -2,13 +2,14 @@ FROM python:3.11-slim
 
 LABEL maintainer="oscar2272"
 
-ENV PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \    
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /src
 
 COPY ./src /src
-COPY ./requirements /requirements
+COPY ./requirements/ingest.txt /requirements/ingest.txt
+COPY ./requirements/base.txt /requirements/base.txt
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -19,7 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG DEV=true
 
 RUN pip install --upgrade pip && \
-    pip install -r /requirements/web.txt && \
+    pip install -r /requirements/base.txt && \
+    pip install -r /requirements/ingest.txt && \
     if [ "$DEV" = "true" ] ; then \
         pip install -r /requirements/web.dev.txt ; \
     fi
