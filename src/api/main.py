@@ -22,16 +22,14 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     container = AppContainer()
-
+    container.wire(modules=["api.routes.health_router"])
     app = FastAPI(
         title="GitChat",
         lifespan=lifespan
     )
 
-    # FastAPI 앱에 컨테이너 연결
     app.container = container
 
-    # 라우터 등록
     app.include_router(health_router)
 
     return app
