@@ -1,5 +1,8 @@
 # Reddit API
 asyncpraw>=7.7
 
+# Github
+PyGithub>=2.3.0
+
 # optional
 tenacity>=8.2
