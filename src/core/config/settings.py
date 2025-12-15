@@ -12,11 +12,15 @@ class AppSettings(BaseSettings):
 
 
     MONGO_URL: str
+    MONGO_URI: str
+    MONGO_DB_NAME: str
+
 
     # REDDIT_CLIENT_ID: str
     # REDDIT_CLIENT_SECRET: str
     # REDDIT_SUBREDDITS: List[str]
 
+    GITHUB_TOKEN: str
     class Config:
         # docker-compose env_file 환경변수 사용 중
         pass
