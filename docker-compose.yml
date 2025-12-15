@@ -11,10 +11,7 @@ services:
     container_name: web-service
     restart: no
     env_file:
-      # - ./env/web.env
-      - ./env/mongo.env
       - ./env/web.env
-      - ./env/ingest.env
     volumes:
       - ./src:/src
     ports:
@@ -29,13 +26,8 @@ services:
       dockerfile: docker/ingest.Dockerfile
     container_name: ingest-service
     restart: no
-    profiles: ["ingest"]
     env_file:
       - ./env/ingest.env
-      - ./env/mongo.env
-    depends_on:
-      mongo:
-        condition: service_healthy
   mongo:
     image: mongo:7
     container_name: mongo-service
@@ -44,28 +36,14 @@ services:
     volumes:
       - mongo-dev-data:/data/db
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=1234
-    expose:
-      - "27017"
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 10
-  mongo-express:
-    image: mongo-express
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: 1234
-      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
-      ME_CONFIG_BASICAUTH: "false"
-    depends_on:
-      mongo:
-        condition: service_healthy
+
 
 volumes:
   mongo-dev-data:

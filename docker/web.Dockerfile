@@ -8,10 +8,8 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /src
 
 COPY ./src /src
+COPY ./requirements/ingest.txt /requirements/ingest.txt
 COPY ./requirements/base.txt /requirements/base.txt
-COPY ./requirements/web.dev.txt /requirements/web.dev.txt
-COPY ./requirements/web.txt /requirements/web.txt
-
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -23,7 +21,7 @@ ARG DEV=true
 
 RUN pip install --upgrade pip && \
     pip install -r /requirements/base.txt && \
-    pip install -r /requirements/web.txt && \
+    pip install -r /requirements/ingest.txt && \
     if [ "$DEV" = "true" ] ; then \
         pip install -r /requirements/web.dev.txt ; \
     fi
