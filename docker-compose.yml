@@ -23,26 +23,12 @@ services:
       mongo:
         condition: service_healthy 
 
-  # ingest:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/ingest.Dockerfile
-  #   container_name: ingest-service
-  #   restart: no
-  #   profiles: ["ingest"]
-  #   env_file:
-  #     - ./env/ingest.env
-  #     - ./env/mongo.env
-  #   depends_on:
-  #     mongo:
-  #       condition: service_healthy
-
-  ingest-worker:
+  ingest:
     build:
       context: .
       dockerfile: docker/ingest.Dockerfile
-    container_name: ingest-worker-1
-    restart: unless-stopped
+    container_name: ingest-service
+    restart: no
     profiles: ["ingest"]
     env_file:
       - ./env/ingest.env
@@ -50,21 +36,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-
-  # Worker 병렬 처리 예시 (필요 시 주석 해제)
-  # ingest-worker-2:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/ingest.Dockerfile
-  #   container_name: ingest-worker-2
-  #   restart: unless-stopped
-  #   profiles: ["ingest"]
-  #   env_file:
-  #     - ./env/ingest.env
-  #     - ./env/mongo.env
-  #   depends_on:
-  #     mongo:
-  #       condition: service_healthy
   mongo:
     image: mongo:7
     container_name: mongo-service
@@ -91,10 +62,7 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
       ME_CONFIG_MONGODB_ADMINPASSWORD: 1234
       ME_CONFIG_MONGODB_AUTH_DATABASE: admin
-      ME_CONFIG_BASICAUTH: "true"
-      ME_CONFIG_BASICAUTH_USERNAME: root
-      ME_CONFIG_BASICAUTH_PASSWORD: 1234
-
+      ME_CONFIG_BASICAUTH: "false"
     depends_on:
       mongo:
         condition: service_healthy

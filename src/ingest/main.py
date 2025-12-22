@@ -1,147 +1,37 @@
 import asyncio
-import signal
-from pymongo.errors import DuplicateKeyError
-
 from core.containers.app_containers import AppContainer
+from ingest.sources.reddit.fetcher import RedditIngestor
+from ingest.sources.github.fetcher import GitHubIngestor
 from ingest.sources.github.indexes import ensure_indexes
-from ingest.sources.github.job_indexes import ensure_job_indexes
-from ingest.sources.github.job_worker import GitHubJobWorker
-from ingest.sources.github.job_generator import generate_jobs_for_backfill
-from ingest.sources.github.job_monitor import print_job_status
 from core.config.settings import settings
-from core.logging.logger import get_logger
-
-logger = get_logger(__name__)
-
-
-async def init_jobs():
-    """
-    Job 생성 로직
-    
-    전략:
-    1. Active job이 있으면 → 생성 안 함 (계속 처리)
-    2. Active job이 없으면 → 새로 생성
-    """
-    container = AppContainer()
-    mongo = container.mongo_client()
-    db = mongo[settings.MONGO_DB_NAME]
-    jobs_col = db["github_ingest_jobs"]
-    
-    # Active job 확인
-    active_count = await jobs_col.count_documents({
-        "status": {"$in": ["pending", "running"]}
-    })
-    
-    if active_count > 0:
-        logger.info(
-            f"Active jobs exist ({active_count} pending/running). "
-            f"Continuing with existing jobs."
-        )
-        await print_job_status(db)
-        return
-    
-    # Total job 확인
-    total_count = await jobs_col.count_documents({})
-    
-    if total_count > 0:
-        logger.info(
-            f"All previous jobs completed or failed ({total_count} total). "
-            f"Creating new jobs..."
-        )
-    else:
-        logger.info("No jobs found. Creating initial jobs...")
-    
-    # Job 정의
-    job_configs = [
-        {
-            "bucket_prefix": settings.GITHUB_INGEST_BUCKET_PREFIX,
-            "query_template": settings.GITHUB_INGEST_QUERY_TEMPLATE,
-            "start_date": settings.GITHUB_INGEST_START_DATE,
-            "end_date": settings.GITHUB_INGEST_END_DATE,
-            "window_days": settings.GITHUB_INGEST_WINDOW_DAYS,
-        },
-    ]
-    
-    total_jobs = []
-    for config in job_configs:
-        jobs = generate_jobs_for_backfill(**config)
-        total_jobs.extend(jobs)
-    
-    if total_jobs:
-        inserted = 0
-        skipped = 0
-        
-        for job in total_jobs:
-            try:
-                await jobs_col.insert_one(job)
-                inserted += 1
-            except DuplicateKeyError:
-                skipped += 1
-        
-        logger.info(
-            f"Job generation complete: "
-            f"{inserted} inserted, {skipped} skipped"
-        )
-        
-        await print_job_status(db)
-    else:
-        logger.warning("No jobs generated")
-
-
-async def run_worker():
-    """Worker 실행"""
-    container = AppContainer()
-    mongo = container.mongo_client()
-    
-    worker = GitHubJobWorker(
-        mongo=mongo,
-        token=settings.GITHUB_TOKEN,
-        pipeline_version=settings.GITHUB_INGEST_PIPELINE_VERSION,
-    )
-    
-    await worker.run(poll_interval=10)
-
 
 async def main():
-    """메인 진입점"""
     container = AppContainer()
     mongo = container.mongo_client()
+
     db = mongo[settings.MONGO_DB_NAME]
 
-    logger.info("=" * 60)
-    logger.info("GitHub Ingest System Starting")
-    logger.info("=" * 60)
-
-    # 인덱스 생성
-    logger.info("🔧 Ensuring indexes...")
     await ensure_indexes(db)
-    await ensure_job_indexes(db)
-    logger.info("Indexes ready")
 
-    # MongoDB 연결 테스트
+    # 레딧 서브레딧 데이터 수집
+    # reddit_ingestor = RedditIngestor(mongo)
+    # for subreddit in settings.REDDIT_SUBREDDITS:
+    #     await reddit_ingestor.run(subreddit)
+
+    # 깃허브 리포지토리 데이터 수집
+    github_ingestor = GitHubIngestor(mongo, settings.GITHUB_TOKEN)
+    github_queries = ["ai OR llm OR agent OR ml OR neural"]
+    for query in github_queries:
+        await github_ingestor.run(
+            query=query, 
+            limit=50, 
+            min_stars=20, 
+            min_size=50, 
+            min_pushed_at=180
+            )
+
+    # 연결 테스트
     await mongo.admin.command("ping")
-    logger.info("MongoDB connected")
-
-    # Job 초기화
-    await init_jobs()
-
-    # Worker 시작
-    logger.info("=" * 60)
-    await run_worker()
-
-
-def signal_handler(signum, frame):
-    """Signal 처리 (Ctrl+C, Docker stop 등)"""
-    logger.info(f"Received signal {signum}. Shutting down...")
-    raise SystemExit(0)
-
 
 if __name__ == "__main__":
-    # Signal 등록
-    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
-    signal.signal(signal.SIGTERM, signal_handler)  # Docker stop
-    
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Shutdown complete")
+    asyncio.run(main())
