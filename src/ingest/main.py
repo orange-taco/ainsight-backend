@@ -3,11 +3,11 @@ import signal
 from pymongo.errors import DuplicateKeyError
 
 from core.containers.app_containers import AppContainer
-from ingest.sources.github.indexes import ensure_indexes
-from ingest.sources.github.job_indexes import ensure_job_indexes
-from ingest.sources.github.job_worker import GitHubJobWorker
-from ingest.sources.github.job_generator import generate_jobs_for_backfill
-from ingest.sources.github.job_monitor import print_job_status
+from ingest.sources.github.shared.indexes import ensure_indexes
+from ingest.sources.github.search.job_indexes import ensure_job_indexes
+from ingest.sources.github.search.job_worker import GitHubJobWorker
+from ingest.sources.github.search.job_generator import generate_jobs_for_backfill
+from ingest.sources.github.search.job_monitor import print_job_status
 from core.config.settings import settings
 from core.logging.logger import get_logger
 

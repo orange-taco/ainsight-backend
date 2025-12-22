@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import List
-from ingest.sources.github.job_schema import create_job_document
+from ingest.sources.github.search.job_schema import create_job_document
 from core.logging.logger import get_logger
 
 def generate_jobs_for_backfill(

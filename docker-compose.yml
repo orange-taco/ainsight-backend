@@ -22,21 +22,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy 
-
-  # ingest:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/ingest.Dockerfile
-  #   container_name: ingest-service
-  #   restart: no
-  #   profiles: ["ingest"]
-  #   env_file:
-  #     - ./env/ingest.env
-  #     - ./env/mongo.env
-  #   depends_on:
-  #     mongo:
-  #       condition: service_healthy
-
   ingest-worker:
     build:
       context: .
@@ -65,6 +50,37 @@ services:
   #   depends_on:
   #     mongo:
   #       condition: service_healthy
+
+  enrichment-worker:
+    build:
+      context: .
+      dockerfile: docker/enrichment.Dockerfile
+    container_name: enrichment-worker-1
+    restart: unless-stopped
+    profiles: ["enrichment"]
+    env_file:
+      - ./env/ingest.env
+      - ./env/mongo.env
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # README Enrichment Worker 병렬 처리 (필요 시 주석 해제)
+  # enrichment-worker-2:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/enrichment.Dockerfile
+  #   container_name: enrichment-worker-2
+  #   restart: unless-stopped
+  #   profiles: ["enrichment"]
+  #   env_file:
+  #     - ./env/ingest.env
+  #     - ./env/mongo.env
+  #   depends_on:
+  #     mongo:
+  #       condition: service_healthy
+
+
   mongo:
     image: mongo:7
     container_name: mongo-service

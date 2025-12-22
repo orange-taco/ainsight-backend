@@ -39,7 +39,7 @@ async def print_job_status(db: AsyncIOMotorDatabase):
     
     # Failed job 세부 정보 (최근 5개)
     if failed > 0:
-        logger.info("❌ Recent Failed Jobs:")
+        logger.info("Recent Failed Jobs:")
         failed_jobs = jobs_col.find({"status": "failed"}).sort("updated_at", -1).limit(5)
         async for job in failed_jobs:
             logger.error(
@@ -58,14 +58,14 @@ async def monitor_jobs_periodically(db: AsyncIOMotorDatabase, interval: int = 60
         interval: 출력 간격 (초, 기본 10분)
     """
     logger = get_logger(__name__)
-    logger.info(f"📊 Job monitor started (interval: {interval}s)")
+    logger.info(f"Job monitor started (interval: {interval}s)")
     
     while True:
         try:
             await asyncio.sleep(interval)
             await print_job_status(db)
         except asyncio.CancelledError:
-            logger.info("📊 Job monitor stopped")
+            logger.info("Job monitor stopped")
             break
         except Exception as e:
             logger.error(f"Monitor error: {e}", exc_info=True)

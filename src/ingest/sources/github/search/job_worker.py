@@ -4,8 +4,8 @@ from typing import Optional
 from pymongo.errors import DuplicateKeyError
 import time
 
-from ingest.sources.github.client import GitHubClient
-from ingest.sources.github.filters import is_valid_repo
+from ingest.sources.github.shared.client import GitHubClient
+from ingest.sources.github.shared.filters import is_valid_repo
 from ingest.mappers.github_repo_mapper import map_repo
 from pymongo.errors import BulkWriteError
 from core.logging.logger import get_logger
