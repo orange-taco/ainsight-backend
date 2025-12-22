@@ -25,11 +25,3 @@ class GitHubClient:
             order="desc",
         )
 
-    def get_readme(self, repo: Repository) -> ContentFile | None:
-        """
-        Fetch README if exists
-        """
-        try:
-            return repo.get_readme()
-        except Exception:
-            return None
