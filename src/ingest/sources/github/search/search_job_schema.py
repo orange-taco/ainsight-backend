@@ -11,7 +11,7 @@ def create_job_document(
     max_attempts: int = 3
 ) -> dict:
     """
-    github_ingest_jobs 컬렉션용 document 생성
+    github_search_jobs 컬렉션용 document 생성
     
     Args:
         bucket: 불변 의미 기반 네이밍 (예: "ml_repos_2024_q1")

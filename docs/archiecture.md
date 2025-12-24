@@ -3,7 +3,8 @@ ainsight-backend/
 ├── .claude/
 │   └── settings.local.json
 ├── docker/
-│   ├── ingest.Dockerfile
+│   ├── readme.Dockerfile
+│   ├── search.Dockerfile
 │   └── web.Dockerfile
 ├── docker-compose.yml
 ├── docs/
@@ -50,7 +51,6 @@ ainsight-backend/
 │   │       └── service.py
 │   └── ingest/
 │       ├── __init__.py
-│       ├── main.py
 │       ├── mappers/
 │       │   ├── __init__.py
 │       │   └── github_repo_mapper.py
@@ -59,15 +59,24 @@ ainsight-backend/
 │       └── sources/
 │           ├── __init__.py
 │           ├── github/
-│           │   ├── client.py
-│           │   ├── fetcher.py
-│           │   ├── filters.py
-│           │   ├── indexes.py
-│           │   ├── job_generator.py
-│           │   ├── job_indexes.py
-│           │   ├── job_monitor.py
-│           │   ├── job_schema.py
-│           │   └── job_worker.py
+│           │   ├── readme/
+│           │   │   ├── main.py
+│           │   │   ├── readme_job_generator.py
+│           │   │   ├── readme_job_indexes.py
+│           │   │   ├── readme_job_schema.py
+│           │   │   └── readme_worker.py
+│           │   ├── search/
+│           │   │   ├── main.py
+│           │   │   ├── search_job_generator.py
+│           │   │   ├── search_job_indexes.py
+│           │   │   ├── search_job_monitor.py
+│           │   │   ├── search_job_schema.py
+│           │   │   └── search_worker.py
+│           │   └── shared/
+│           │       ├── client.py
+│           │       ├── fetcher.py
+│           │       ├── filters.py
+│           │       └── repo_indexes.py
 │           └── reddit/
 │               ├── __init__.py
 │               ├── client.py

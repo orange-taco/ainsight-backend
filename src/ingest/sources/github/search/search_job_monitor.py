@@ -8,7 +8,7 @@ async def print_job_status(db: AsyncIOMotorDatabase):
     """
     Job 상태 요약 출력
     """
-    jobs_col = db["github_ingest_jobs"]
+    jobs_col = db["github_search_jobs"]
     logger = get_logger(__name__)
     
     # 상태별 집계

@@ -5,7 +5,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 COPY ./requirements/base.txt /requirements/base.txt
 COPY ./requirements/ingest.txt /requirements/ingest.txt
-COPY ./src /src
+
+COPY ./src/core /src/core
+COPY ./src/ingest /src/ingest
 
 WORKDIR /src
 
@@ -17,4 +19,4 @@ RUN pip install --upgrade pip && \
     pip install -r /requirements/base.txt && \
     pip install -r /requirements/ingest.txt
 
-CMD ["python", "-m", "ingest.main"]
+CMD ["python", "-m", "ingest.sources.github.search.main"]
