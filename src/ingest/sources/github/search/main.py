@@ -3,17 +3,19 @@ import signal
 from pymongo.errors import DuplicateKeyError
 
 from core.containers.app_containers import AppContainer
-from ingest.sources.github.indexes import ensure_indexes
-from ingest.sources.github.job_indexes import ensure_job_indexes
-from ingest.sources.github.job_worker import GitHubJobWorker
-from ingest.sources.github.job_generator import generate_jobs_for_backfill
-from ingest.sources.github.job_monitor import print_job_status
+from ingest.sources.github.search.search_job_indexes import ensure_search_job_indexes
+from ingest.sources.github.shared.repo_indexes import ensure_repo_indexes
+from ingest.sources.github.search.search_worker import GitHubJobWorker
+from ingest.sources.github.search.search_job_generator import generate_jobs_for_backfill
+from ingest.sources.github.search.search_job_monitor import print_job_status
 from core.config.settings import settings
 from core.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
+worker_instance = None
 
+# Global worker reference for signal handler
 async def init_jobs():
     """
     Job 생성 로직
@@ -25,7 +27,7 @@ async def init_jobs():
     container = AppContainer()
     mongo = container.mongo_client()
     db = mongo[settings.MONGO_DB_NAME]
-    jobs_col = db["github_ingest_jobs"]
+    jobs_col = db["github_search_jobs"]
     
     # Active job 확인
     active_count = await jobs_col.count_documents({
@@ -90,15 +92,18 @@ async def init_jobs():
 
 async def run_worker():
     """Worker 실행"""
+    global worker_instance
+
     container = AppContainer()
     mongo = container.mongo_client()
     
     worker = GitHubJobWorker(
         mongo=mongo,
-        token=settings.GITHUB_TOKEN,
+        token=settings.get_github_token(),
+        worker_id=settings.WORKER_ID,
         pipeline_version=settings.GITHUB_INGEST_PIPELINE_VERSION,
     )
-    
+    worker_instance = worker
     await worker.run(poll_interval=10)
 
 
@@ -114,8 +119,8 @@ async def main():
 
     # 인덱스 생성
     logger.info("🔧 Ensuring indexes...")
-    await ensure_indexes(db)
-    await ensure_job_indexes(db)
+    await ensure_repo_indexes(db)
+    await ensure_search_job_indexes(db)
     logger.info("Indexes ready")
 
     # MongoDB 연결 테스트
@@ -131,8 +136,13 @@ async def main():
 
 
 def signal_handler(signum, frame):
-    """Signal 처리 (Ctrl+C, Docker stop 등)"""
-    logger.info(f"Received signal {signum}. Shutting down...")
+    global worker_instance
+
+    logger.info(f"Received signal {signum}. Intiating graceful shucdown")
+    
+    if worker_instance:
+        worker_instance.shutdown_requested = True
+
     raise SystemExit(0)
 
 

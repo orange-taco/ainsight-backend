@@ -15,13 +15,18 @@ class AppSettings(BaseSettings):
     MONGO_URI: str
     MONGO_DB_NAME: str
 
+    # ===== INGEST =====
+    WORKER_ID: int = 1
+    TOTAL_WORKERS: int = 1
+     
     # ===== Reddit =====
     # REDDIT_CLIENT_ID: str
     # REDDIT_CLIENT_SECRET: str
     # REDDIT_SUBREDDITS: List[str]
 
     # ===== GitHub =====
-    GITHUB_TOKEN: str
+    GITHUB_TOKEN_1: str
+    GITHUB_TOKEN_2: str
     GITHUB_INGEST_PIPELINE_VERSION: str = "github_ingest_v1"
 
     # Job Configuration
@@ -30,10 +35,15 @@ class AppSettings(BaseSettings):
     GITHUB_INGEST_START_DATE: str = "2022-01-01"
     GITHUB_INGEST_END_DATE: str = "2024-12-31"
     GITHUB_INGEST_WINDOW_DAYS: int = 3
-
+    def get_github_token(self) -> str:
+        """워커 ID에 맞는 토큰 반환"""
+        if self.WORKER_ID == 1:
+            return self.GITHUB_TOKEN_1
+        elif self.WORKER_ID == 2:
+            return self.GITHUB_TOKEN_2
+        return self.GITHUB_TOKEN_1  # fallback
     class Config:
-        # docker-compose env_file 환경변수 사용 중
-        pass
+        extra = "ignore"
 
 
 settings = AppSettings()

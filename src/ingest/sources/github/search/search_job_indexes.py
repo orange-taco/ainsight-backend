@@ -1,8 +1,8 @@
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-async def ensure_job_indexes(db: AsyncIOMotorDatabase):
-    """github_ingest_jobs 컬렉션 인덱스 생성"""
-    col = db["github_ingest_jobs"]
+async def ensure_search_job_indexes(db: AsyncIOMotorDatabase):
+    """github_search_jobs 컬렉션 인덱스 생성"""
+    col = db["github_search_jobs"]
 
     # status + created_at: pending job을 오래된 순서로 가져오기
     await col.create_index(

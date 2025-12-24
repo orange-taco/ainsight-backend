@@ -5,13 +5,16 @@ LABEL maintainer="oscar2272"
 ENV PYTHONUNBUFFERED=1 \    
     PYTHONDONTWRITEBYTECODE=1
 
-WORKDIR /src
 
-COPY ./src /src
 COPY ./requirements/base.txt /requirements/base.txt
 COPY ./requirements/web.dev.txt /requirements/web.dev.txt
 COPY ./requirements/web.txt /requirements/web.txt
 
+COPY ./src/api /src/api
+COPY ./src/core /src/core
+COPY ./src/domains /src/domains
+
+WORKDIR /src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \

@@ -8,7 +8,6 @@ services:
       args:
         - DEV=true
     init: true
-    container_name: web-service
     restart: no
     env_file:
       # - ./env/web.env
@@ -22,52 +21,70 @@ services:
     depends_on:
       mongo:
         condition: service_healthy 
-
-  # ingest:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/ingest.Dockerfile
-  #   container_name: ingest-service
-  #   restart: no
-  #   profiles: ["ingest"]
-  #   env_file:
-  #     - ./env/ingest.env
-  #     - ./env/mongo.env
-  #   depends_on:
-  #     mongo:
-  #       condition: service_healthy
-
-  ingest-worker:
+  search-worker-1:
     build:
       context: .
-      dockerfile: docker/ingest.Dockerfile
-    container_name: ingest-worker-1
+      dockerfile: docker/search.Dockerfile
     restart: unless-stopped
-    profiles: ["ingest"]
+    profiles: ["search"]
     env_file:
       - ./env/ingest.env
       - ./env/mongo.env
+    environment:
+      - WORKER_ID=1
+    depends_on:
+      mongo:
+        condition: service_healthy
+    
+  search-worker-2:
+    build:
+      context: .
+      dockerfile: docker/search.Dockerfile
+    restart: unless-stopped
+    profiles: ["search"]
+    env_file:
+      - ./env/ingest.env
+      - ./env/mongo.env
+    environment:
+      - WORKER_ID=2
     depends_on:
       mongo:
         condition: service_healthy
 
-  # Worker 병렬 처리 예시 (필요 시 주석 해제)
-  # ingest-worker-2:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/ingest.Dockerfile
-  #   container_name: ingest-worker-2
-  #   restart: unless-stopped
-  #   profiles: ["ingest"]
-  #   env_file:
-  #     - ./env/ingest.env
-  #     - ./env/mongo.env
-  #   depends_on:
-  #     mongo:
-  #       condition: service_healthy
+  readme-worker-1:
+    build:
+      context: .
+      dockerfile: docker/readme.Dockerfile
+    restart: unless-stopped
+    profiles: ["readme"]
+    env_file:
+      - ./env/ingest.env
+      - ./env/mongo.env
+    environment:
+      - WORKER_ID=1
+      - TOTAL_WORKERS=2
+    depends_on:
+      mongo:
+        condition: service_healthy
+  readme-worker-2:
+    build:
+      context: .
+      dockerfile: docker/readme.Dockerfile
+    restart: unless-stopped
+    profiles: ["readme"]
+    env_file:
+      - ./env/ingest.env
+      - ./env/mongo.env
+    environment:
+      - WORKER_ID=2
+      - TOTAL_WORKERS=2
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+
   mongo:
     image: mongo:7
-    container_name: mongo-service
     ports:
       - "27017:27017"
     volumes:

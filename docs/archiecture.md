@@ -1,17 +1,22 @@
-### 파일구조 
+### 파일구조
 ainsight-backend/
+├── .claude/
+│   └── settings.local.json
 ├── docker/
-│   ├── ingest.Dockerfile
+│   ├── readme.Dockerfile
+│   ├── search.Dockerfile
 │   └── web.Dockerfile
 ├── docker-compose.yml
 ├── docs/
+│   ├── archiecture.md
 │   ├── git-branch-rules.md
-│   └── git-message-rules.md
+│   ├── git-message-rules.md
+│   └── github-api-docs.md
 ├── env/
 │   ├── ingest.env
 │   ├── mongo.env
 │   ├── web.env
-│   └── web.dev.env
+│   └── woker.env
 ├── README.md
 ├── requirements/
 │   ├── base.txt
@@ -36,9 +41,9 @@ ainsight-backend/
 │   │   │   ├── __init__.py
 │   │   │   ├── __pycache__/
 │   │   │   └── app_containers.py
-│   │   └── db/
+│   │   └── logging/
 │   │       ├── __init__.py
-│   │       └── mongo.py
+│   │       └── logger.py
 │   ├── domains/
 │   │   └── tmp/
 │   │       ├── models.py
@@ -46,16 +51,32 @@ ainsight-backend/
 │   │       └── service.py
 │   └── ingest/
 │       ├── __init__.py
-│       ├── main.py
+│       ├── mappers/
+│       │   ├── __init__.py
+│       │   └── github_repo_mapper.py
 │       ├── models/
 │       │   └── document.py
 │       └── sources/
 │           ├── __init__.py
 │           ├── github/
-│           │   ├── client.py
-│           │   └── fetcher.py
-│           │   └── filter.py
-│           │   └── db_indexes.js
+│           │   ├── readme/
+│           │   │   ├── main.py
+│           │   │   ├── readme_job_generator.py
+│           │   │   ├── readme_job_indexes.py
+│           │   │   ├── readme_job_schema.py
+│           │   │   └── readme_worker.py
+│           │   ├── search/
+│           │   │   ├── main.py
+│           │   │   ├── search_job_generator.py
+│           │   │   ├── search_job_indexes.py
+│           │   │   ├── search_job_monitor.py
+│           │   │   ├── search_job_schema.py
+│           │   │   └── search_worker.py
+│           │   └── shared/
+│           │       ├── client.py
+│           │       ├── fetcher.py
+│           │       ├── filters.py
+│           │       └── repo_indexes.py
 │           └── reddit/
 │               ├── __init__.py
 │               ├── client.py
