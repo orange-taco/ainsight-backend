@@ -128,7 +128,10 @@ async def main():
     logger.info("MongoDB connected")
 
     # Job 초기화
-    await init_jobs()
+        # Job 초기화 (Worker 1만 실행)
+    if settings.WORKER_ID == 1:
+        await init_jobs()
+    await print_job_status(db)
 
     # Worker 시작
     logger.info("=" * 60)
@@ -143,7 +146,6 @@ def signal_handler(signum, frame):
     if worker_instance:
         worker_instance.shutdown_requested = True
 
-    raise SystemExit(0)
 
 
 if __name__ == "__main__":

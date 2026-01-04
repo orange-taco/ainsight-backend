@@ -239,51 +239,45 @@ class GitHubJobWorker:
         consecutive_empty = 0
 
         try:
-            while True:
-                # Shutdown 요청 체크
-                if self.shutdown_requested:
-                    self.logger.info("Shutdown requested, stopping worker...")
-                    break
+            while not self.shutdown_requested:
+                job = await self.acquire_job()
                 
-                try:
-                    job = await self.acquire_job()
+                if job:
+                    consecutive_empty = 0
+                    await self.process_job(job)
+                else:
+                    consecutive_empty += 1
+                    if auto_exit:
+                        active_count = await self.jobs_col.count_documents({
+                            "status": {"$in": ["pending", "running"]}
+                        })
+                        if active_count == 0:
+                            self.logger.info(f"[worker-{self.worker_id}] No active jobs. Exiting...")
+                            break
                     
-                    if job:
-                        consecutive_empty = 0
-                        await self.process_job(job)
-                    else:
-                        consecutive_empty += 1
-                        if auto_exit:
-                            active_count = await self.jobs_col.count_documents({
-                                "status": {"$in": ["pending", "running"]}
-                            })
-                            if active_count == 0:
-                                self.logger.info(f"[worker-{self.worker_id}] No active jobs. Exiting...")
-                                break
-                        
-                        if consecutive_empty == 1:
-                            self.logger.info(f"[worker-{self.worker_id}] No pending jobs. Waiting...")
-                        elif consecutive_empty % 10 == 0:
-                            # 10번마다 한 번씩 로그
-                            self.logger.info(
-                                f"[worker-{self.worker_id}] Still waiting for jobs... "
-                                f"({consecutive_empty} polls, {consecutive_empty * poll_interval}s elapsed)"
-                            )
-                        
-                        await asyncio.sleep(poll_interval)
-                        
-                except KeyboardInterrupt:
-                    self.logger.info("KeyboardInterrupt received in worker loop")
-                    raise  # 상위로 전파
+                    if consecutive_empty == 1:
+                        self.logger.info(f"[worker-{self.worker_id}] No pending jobs. Waiting...")
+                    elif consecutive_empty % 10 == 0:
+                        # 10번마다 한 번씩 로그
+                        self.logger.info(
+                            f"[worker-{self.worker_id}] Still waiting for jobs... "
+                            f"({consecutive_empty} polls, {consecutive_empty * poll_interval}s elapsed)"
+                        )
                     
-                except Exception as e:
-                    self.logger.error(
-                        f"Unexpected error in worker loop: {e}",
-                        exc_info=True
-                    )
-                    await asyncio.sleep(poll_interval)
-        
+                    # Sleep을 1초씩 쪼개서 shutdown 체크
+                    for _ in range(poll_interval):
+                        if self.shutdown_requested:
+                            break
+                        await asyncio.sleep(1)
+                    
+        except KeyboardInterrupt:
+            self.logger.info("KeyboardInterrupt received, initiating cleanup...")
+        except Exception as e:
+            self.logger.error(
+                f"Unexpected error in worker loop: {e}",
+                exc_info=True
+            )
         finally:
             # 항상 cleanup 실행
             self.logger.info("Running cleanup before exit...")
-            await self.cleanup()             
+            await self.cleanup()     
