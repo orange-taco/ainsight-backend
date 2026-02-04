@@ -76,7 +76,7 @@ async def print_job_status(db):
     no_readme = status_counts.get("no_readme", 0)
     
     logger.info("=" * 60)
-    logger.info("📊 README Job Status Summary")
+    logger.info(" README Job Status Summary")
     logger.info("=" * 60)
     logger.info(f"Total:      {total:6d}")
     logger.info(f"Pending:    {pending:6d}  ({pending/total*100:.1f}%)" if total > 0 else "Pending:        0")
