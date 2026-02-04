@@ -55,12 +55,14 @@ class ReadmeWorker:
         """
         job = await self.jobs_col.find_one_and_update(
             {
-                "status": "pending",
-                "attempts": {"$lt": "$max_attempts"},  # max_attempts 체크
+                "status": "pending",  
                 "$expr": {
-                    "$eq": [
-                        {"$mod": ["$repo_id", self.total_workers]},
-                        self.worker_id
+                    "$and": [
+                        {"$lt": ["$attempts", "$max_attempts"]},  # 필드끼리 비교
+                        {"$eq": [
+                            {"$mod": ["$repo_id", self.total_workers]},
+                            self.worker_id - 1
+                        ]}
                     ]
                 }
             },
@@ -123,7 +125,7 @@ class ReadmeWorker:
             self.success_count += 1
             
             self.logger.info(
-                f"[Job {job_id}] ✅ README fetched for {full_name} "
+                f"[worker-{self.worker_id}][Job {job_id}] ✅ README fetched for {full_name} "
                 f"({len(readme_content)} chars)"
             )
             self.current_job_id = None 
@@ -260,6 +262,7 @@ class ReadmeWorker:
             f"Rate: {rate:.1f} jobs/sec"
         )
 
+
     async def run(self, poll_interval: int = 10, auto_exit: bool = True):
         """
         무한 루프로 job 처리
@@ -269,60 +272,55 @@ class ReadmeWorker:
         consecutive_empty = 0
 
         try:
-            while True:
-                # Shutdown 요청 체크
-                if self.shutdown_requested:
-                    self.logger.info("Shutdown requested, stopping worker...")
-                    break
+            while not self.shutdown_requested:
+                job = await self.acquire_job()
                 
-                try:
-                    job = await self.acquire_job()
+                if job:
+                    consecutive_empty = 0
+                    await self.process_job(job)
+                else:
+                    consecutive_empty += 1
                     
-                    if job:
-                        consecutive_empty = 0
-                        await self.process_job(job)
-                    else:
-                        consecutive_empty += 1
-                        
-                        if auto_exit:
-                            active_count = await self.jobs_col.count_documents({
-                                "status": {"$in": ["pending", "running"]},
-                                "$expr": {
-                                    "$eq": [
+                    if auto_exit:
+                        pending_count = await self.jobs_col.count_documents({
+                            "status": {"$in": ["pending", "running"]},
+                            "$expr": {
+                                "$and": [
+                                    {"$lt": ["$attempts", "$max_attempts"]},
+                                    {"$eq": [
                                         {"$mod": ["$repo_id", self.total_workers]},
-                                        self.worker_id
-                                    ]
-                                }
-                            })
-                            if active_count == 0:
-                                self.logger.info(
-                                    f"[Worker {self.worker_id}] No active jobs in my partition. Exiting..."
-                                )
-                                break
-                        
-                        if consecutive_empty == 1:
-                            self.logger.info("No pending jobs. Waiting...")
-                        elif consecutive_empty % 10 == 0:
+                                        self.worker_id - 1
+                                    ]}
+                                ]
+
+                            }
+                        })
+                        if pending_count == 0:
                             self.logger.info(
-                                f"Still waiting for jobs... "
-                                f"({consecutive_empty} polls, {consecutive_empty * poll_interval}s elapsed)"
+                                f"[Worker {self.worker_id}] No active jobs in my partition. Exiting..."
                             )
-                        
-                        await asyncio.sleep(poll_interval)
-                        
-                except KeyboardInterrupt:
-                    self.logger.info("KeyboardInterrupt received in worker loop")
-                    raise
+                            break
                     
-                except Exception as e:
-                    self.logger.error(
-                        f"Unexpected error in worker loop: {e}",
-                        exc_info=True
-                    )
-                    await asyncio.sleep(poll_interval)
-        
+                    if consecutive_empty == 1:
+                        self.logger.info("No pending jobs. Waiting...")
+                    elif consecutive_empty % 10 == 0:
+                        self.logger.info(
+                            f"Still waiting for jobs... "
+                            f"({consecutive_empty} polls, {consecutive_empty * poll_interval}s elapsed)"
+                        )
+                        await asyncio.sleep(poll_interval)
+
+        except asyncio.CancelledError:
+            self.logger.info("Worker task cancelled, initiation cleanup...")            
+        except KeyboardInterrupt:
+            self.logger.info("KeyboardInterrupt received, initiating cleanup...")
+        except Exception as e:
+            self.logger.error(
+                f"Unexpected error in worker loop: {e}",
+                exc_info=True
+            )
         finally:
             # 항상 cleanup 실행
             self.logger.info("Running cleanup before exit...")
             await self.cleanup()
-            
+                   

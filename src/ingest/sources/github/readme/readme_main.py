@@ -1,5 +1,6 @@
 import asyncio
 import signal
+from datetime import datetime, timezone 
 
 from core.containers.app_containers import AppContainer
 from ingest.sources.github.shared.repo_indexes import ensure_repo_indexes
@@ -10,9 +11,6 @@ from core.config.settings import settings
 from core.logging.logger import get_logger
 
 logger = get_logger(__name__)
-
-# Global worker reference for signal handler
-worker_instance = None
 
 async def init_jobs(db):
     """
@@ -48,7 +46,7 @@ async def init_jobs(db):
         logger.info("No jobs found. Creating initial jobs...")
     
     # Job 생성
-    inserted = await generate_readme_jobs(db, batch_size=10000)
+    inserted = await generate_readme_jobs(db)
     
     if inserted > 0:
         logger.info(f"Created {inserted} README jobs")
@@ -78,7 +76,7 @@ async def print_job_status(db):
     no_readme = status_counts.get("no_readme", 0)
     
     logger.info("=" * 60)
-    logger.info("📊 README Job Status Summary")
+    logger.info(" README Job Status Summary")
     logger.info("=" * 60)
     logger.info(f"Total:      {total:6d}")
     logger.info(f"Pending:    {pending:6d}  ({pending/total*100:.1f}%)" if total > 0 else "Pending:        0")
@@ -90,7 +88,6 @@ async def print_job_status(db):
 
 
 async def run_worker():
-    global worker_instance
 
     """Worker 실행"""
     container = AppContainer()
@@ -102,21 +99,35 @@ async def run_worker():
         worker_id=settings.WORKER_ID,
         total_workers=settings.TOTAL_WORKERS,
     )
-    worker_instance=worker
     
     await worker.run(poll_interval=10)
 
-def signal_handler(signum, frame):
-    """Signal 처리 (Ctrl+C, Docker stop 등)"""
-    global worker_instance
+async def cleanup_stale_running_jobs(db):
+    """
+    시작 시 running 상태로 남아있는 job들을 pending으로 복구
+    이전 실행에서 cleanup이 실패한 경우를 대비
+    """
+    jobs_col = db["github_readme_jobs"]
     
-    logger.info(f"Received signal {signum}. Initiating graceful shutdown...")
+    result = await jobs_col.update_many(
+        {"status": "running"},
+        {
+            "$set": {
+                "status": "pending",
+                "updated_at": datetime.now(timezone.utc),
+            }
+        }
+    )
     
-    if worker_instance:
-        worker_instance.shutdown_requested = True
+    if result.modified_count > 0:
+        logger.info(
+            f"🔧 Restored {result.modified_count} stale running jobs to pending"
+        )
+    else:
+        logger.info("✓ No stale running jobs found")
     
-    raise SystemExit(0)
-    
+    return result.modified_count
+
 async def main():
     """메인 진입점"""
     container = AppContainer()
@@ -137,26 +148,25 @@ async def main():
     await mongo.admin.command("ping")
     logger.info("MongoDB connected")
 
+    await cleanup_stale_running_jobs(db)
     # Job 초기화
     await init_jobs(db)
     await print_job_status(db)
 
+    loop = asyncio.get_running_loop()
+    worker_task = None 
+
     # Worker 시작
     logger.info("=" * 60)
-    await run_worker()
+    try:
+        await run_worker()  # worker_task 안 만들고 직접 await
+    finally:
+        pass  # signal handler 제거할 필요 없음
 
 
-def signal_handler(signum, frame):
-    """Signal 처리 (Ctrl+C, Docker stop 등)"""
-    logger.info(f"Received signal {signum}. Shutting down...")
-    raise SystemExit(0)
 
 
-if __name__ == "__main__":
-    # Signal 등록
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
+if __name__ == "__main__":    
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):

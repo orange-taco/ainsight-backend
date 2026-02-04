@@ -19,4 +19,4 @@ RUN pip install --upgrade pip && \
     pip install -r /requirements/base.txt && \
     pip install -r /requirements/ingest.txt
 
-CMD ["python", "-m", "ingest.sources.github.readme.main"]
+CMD ["python", "-m", "ingest.sources.github.readme.readme_main"]

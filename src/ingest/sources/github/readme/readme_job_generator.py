@@ -6,13 +6,12 @@ from core.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-async def generate_readme_jobs(db, batch_size: int = 10000) -> int:
+async def generate_readme_jobs(db) -> int:
     """
     github_repositories에서 readme_fetched=false인 repo들의 job 생성
     
     Args:
         db: MongoDB database
-        batch_size: 한 번에 처리할 repo 개수
         
     Returns:
         생성된 job 개수
@@ -24,7 +23,7 @@ async def generate_readme_jobs(db, batch_size: int = 10000) -> int:
     cursor = repos_col.find(
         {"enrichment.readme_fetched": False},
         {"repo_id": 1, "full_name": 1}
-    ).limit(batch_size)
+    )
     
     jobs = []
     async for repo in cursor:

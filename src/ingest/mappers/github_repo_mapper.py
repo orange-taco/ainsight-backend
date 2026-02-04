@@ -8,7 +8,7 @@ def map_repo(repo, query: str, bucket: str, pipeline_version: str) -> dict:
         # Identity (절대 변하지 않음)
         # --------------------
         "source": "github",
-        "repo_id": repo.id,                 # ⭐ unique key
+        "repo_id": repo.id,                 # unique key
         "full_name": repo.full_name,            # owner/name
         "name": repo.name,
         "owner": repo.owner.login,
