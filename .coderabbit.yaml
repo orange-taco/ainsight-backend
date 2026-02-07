@@ -1,0 +1,5 @@
+reviews:
+  auto_review:
+    enabled: true
+    ignore_base_branches: false
+  review_status: false
