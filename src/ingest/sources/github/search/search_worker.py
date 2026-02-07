@@ -230,13 +230,14 @@ class GitHubJobWorker:
         )
         self.current_job_id = None
 
-    async def run(self, poll_interval: int = 10, auto_exit: bool = True):
+    async def run(self, poll_interval: int = 10, auto_exit: bool = True, startup_wait: int = 5):
         """
         무한 루프로 job 처리 (Docker에서 실행)
         """
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
         consecutive_empty = 0
+        startup_grace_period = startup_wait  # 초기 N초는 job 생성 대기
 
         try:
             while not self.shutdown_requested:
@@ -244,10 +245,11 @@ class GitHubJobWorker:
                 
                 if job:
                     consecutive_empty = 0
+                    startup_grace_period = 0  # job 발견하면 grace period 종료
                     await self.process_job(job)
                 else:
                     consecutive_empty += 1
-                    if auto_exit:
+                    if auto_exit and startup_grace_period <= 0:
                         active_count = await self.jobs_col.count_documents({
                             "status": {"$in": ["pending", "running"]}
                         })
@@ -255,7 +257,11 @@ class GitHubJobWorker:
                             self.logger.info(f"[worker-{self.worker_id}] No active jobs. Exiting...")
                             break
                     
-                    if consecutive_empty == 1:
+                    if startup_grace_period > 0:
+                        startup_grace_period -= 1
+                        if consecutive_empty == 1:
+                            self.logger.info(f"[worker-{self.worker_id}] Waiting for job generation... ({startup_grace_period}s grace period remaining)")
+                    elif consecutive_empty == 1:
                         self.logger.info(f"[worker-{self.worker_id}] No pending jobs. Waiting...")
                     elif consecutive_empty % 10 == 0:
                         # 10번마다 한 번씩 로그

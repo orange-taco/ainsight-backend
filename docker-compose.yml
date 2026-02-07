@@ -90,6 +90,23 @@ services:
       mongo:
         condition: service_healthy
 
+  readme-classify-worker:
+    build:
+      context: .
+      dockerfile: docker/classify.Dockerfile
+    init: true
+    restart: no
+    profiles: ["readme-classify"]
+    env_file:
+      - ./env/ingest.env
+      - ./env/mongo.env
+    environment:
+      - WORKER_ID=1
+    volumes:
+      - ./src/ingest:/src/ingest
+    depends_on:
+      mongo:
+        condition: service_healthy
 
   mongo:
     image: mongo:7

@@ -29,6 +29,9 @@ class AppSettings(BaseSettings):
     GITHUB_TOKEN_2: str
     GITHUB_INGEST_PIPELINE_VERSION: str = "github_ingest_v1"
 
+    # ===== OpenAI =====
+    OPENAI_API_KEY: str
+
     # Job Configuration
     GITHUB_INGEST_BUCKET_PREFIX: str = "ml_repos"
     GITHUB_INGEST_QUERY_TEMPLATE: str = "created:{from_date}..{to_date} stars:>20"
