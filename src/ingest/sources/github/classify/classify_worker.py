@@ -79,23 +79,47 @@ class ClassifyWorker:
         except Exception as e:
             await self._handle_error(job, str(e))
 
+    VALID_CATEGORIES = (
+        "web_framework", "data_science", "ml_ai", "cli", "testing",
+        "database", "http", "devtools", "auth", "messaging", "cloud",
+        "ui", "validation", "logging", "networking", "other",
+    )
+
     async def _classify_with_llm(self, readme: str) -> dict:
         """LLM 호출하여 분류"""
-        prompt = f"""Is this a reusable library/package or an end-user application?
+        categories = ", ".join(f'"{c}"' for c in self.VALID_CATEGORIES)
+        prompt = f"""You are a classifier. Determine if this GitHub repository is a reusable library/package or an end-user application.
 
 README:
 {readme}
 
-Answer in JSON:
+Respond with ONLY valid JSON, no other text. Follow this exact format:
+
 {{
-  "is_library": true/false,
-  "category": "web_framework|data_science|cli|testing|database|http|devtools|other",
-  "confidence": 0.0-1.0,
-  "reason": "brief explanation"
-}}"""
-        
+  "is_library": true,
+  "category": "web_framework",
+  "confidence": 0.85,
+  "reason": "This is a reusable HTTP client library"
+}}
+
+Rules:
+- "is_library": must be true or false
+- "category": one of {categories}
+- "confidence": number between 0.0 and 1.0
+- "reason": one sentence explanation
+- Do NOT include any text outside the JSON object"""
+
         response = await self.llm.generate(prompt)
-        return json.loads(response)
+        try:
+            data = json.loads(response)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from LLM: {e}") from e
+        for key in ("is_library", "confidence", "reason", "category"):
+            if key not in data:
+                raise ValueError(f"LLM response missing key: {key}")
+        if data["category"] not in self.VALID_CATEGORIES:
+            data["category"] = "other"
+        return data
 
     async def _handle_error(self, job: dict, error_msg: str):
         self.logger.error(f"[worker-{self.worker_id}] [Job {self.current_job_id}] Error: {error_msg}")
