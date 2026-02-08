@@ -237,7 +237,7 @@ class GitHubJobWorker:
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
         consecutive_empty = 0
-        startup_grace_period = startup_wait  # 초기 N초는 job 생성 대기
+        startup_grace_period = -(-startup_wait // poll_interval)
 
         try:
             while not self.shutdown_requested:
@@ -260,7 +260,7 @@ class GitHubJobWorker:
                     if startup_grace_period > 0:
                         startup_grace_period -= 1
                         if consecutive_empty == 1:
-                            self.logger.info(f"[worker-{self.worker_id}] Waiting for job generation... ({startup_grace_period}s grace period remaining)")
+                            self.logger.info(f"[worker-{self.worker_id}] Waiting for job generation... ({startup_grace_period * poll_interval}s grace period remaining)")
                     elif consecutive_empty == 1:
                         self.logger.info(f"[worker-{self.worker_id}] No pending jobs. Waiting...")
                     elif consecutive_empty % 10 == 0:
