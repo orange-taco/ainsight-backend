@@ -1,8 +1,7 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+import signal
 from typing import Optional
-from pymongo.errors import DuplicateKeyError
-import time
 
 from ingest.sources.github.shared.client import GitHubClient
 from ingest.sources.github.shared.filters import is_valid_repo
@@ -140,12 +139,13 @@ class GitHubJobWorker:
                 f"[worker-{self.worker_id}] [Job {self.current_job_id}] ✅ Completed successfully "
                 f"({len(documents)} repos collected)"
             )
+            self.current_job_id = None
 
         except GithubException as e:
-            await self._handle_github_error(self.current_job_id, job, e)
+            await self._handle_github_error(job, e)
 
         except Exception as e:
-            await self._handle_generic_error(self.current_job_id, job, e)
+            await self._handle_generic_error(job, e)
 
     async def _handle_github_error(self, job: dict, error: GithubException):
         """
@@ -193,7 +193,7 @@ class GitHubJobWorker:
         # 그 외 GitHub 에러 (404, 422 등)
         error_msg = f"GitHub API error ({error.status}): {error.data.get('message', str(error))}"
         self.logger.error(f"[worker-{self.worker_id}] [Job {self.current_job_id}] {error_msg}")
-        await self._mark_job_failed(self.current_job_id, job, error_msg)
+        await self._mark_job_failed(job, error_msg)
 
     async def _handle_generic_error(self,  job: dict, error: Exception):
         """
@@ -201,7 +201,7 @@ class GitHubJobWorker:
         """
         error_msg = f"Unexpected error: {str(error)}"
         self.logger.error(f"[worker-{self.worker_id}] [Job {self.current_job_id}] {error_msg}", exc_info=True)
-        await self._mark_job_failed(self.current_job_id, job, error_msg)
+        await self._mark_job_failed(job, error_msg)
 
     async def _mark_job_failed(self, job: dict, error_message: str):
         """
@@ -236,6 +236,10 @@ class GitHubJobWorker:
         """
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
+
         consecutive_empty = 0
         startup_grace_period = -(-startup_wait // poll_interval)
 

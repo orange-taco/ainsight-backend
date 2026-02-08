@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import signal
 from typing import Optional
 from github import GithubException
 
@@ -22,13 +23,6 @@ class ReadmeWorker:
         self.logger = get_logger(__name__)
         self.current_job_id = None  # 현재 처리 중인 job 추적
         self.shutdown_requested = False
-
-        # 진행상황 추적용
-        self.processed_count = 0
-        self.success_count = 0
-        self.no_readme_count = 0
-        self.failed_count = 0
-        self.start_time = None
 
     async def cleanup(self):
         """
@@ -95,7 +89,6 @@ class ReadmeWorker:
             if readme_content is None:
                 # README 없음
                 await self._mark_no_readme(job_id, repo_id, full_name)
-                self.no_readme_count += 1
                 return
             
             # github_repositories 업데이트
@@ -122,8 +115,6 @@ class ReadmeWorker:
                 },
             )
 
-            self.success_count += 1
-            
             self.logger.info(
                 f"[worker-{self.worker_id}][Job {job_id}] ✅ README fetched for {full_name} "
                 f"({len(readme_content)} chars)"
@@ -132,11 +123,9 @@ class ReadmeWorker:
 
         except GithubException as e:
             await self._handle_github_error(job_id, job, e, full_name)
-            self.failed_count += 1
 
         except Exception as e:
-            await self._handle_generic_error(job_id, job, e, full_name)
-            self.failed_count += 1
+            await self._handle_generic_error(job_id, job, e)
 
     async def _mark_no_readme(self, job_id, repo_id: int, full_name: str):
         """
@@ -212,7 +201,7 @@ class ReadmeWorker:
         self.logger.error(f"[worker {self.worker_id} ] [Job {job_id}] {error_msg}")
         await self._mark_job_failed(job_id, job, error_msg)
 
-    async def _handle_generic_error(self, job_id, job: dict, error: Exception, full_name: str):
+    async def _handle_generic_error(self, job_id, job: dict, error: Exception):
         """
         일반 에러 처리
         """
@@ -246,29 +235,16 @@ class ReadmeWorker:
         )
         self.current_job_id = None 
 
-    def _log_progress(self):
-        """진행상황 로그 출력"""
-        if self.start_time is None:
-            return
-            
-        elapsed = (datetime.now(timezone.utc) - self.start_time).total_seconds()
-        rate = self.processed_count / elapsed if elapsed > 0 else 0
-        
-        self.logger.info(
-            f"[Worker {self.worker_id}] Progress: {self.processed_count} jobs processed "
-            f"(✅ {self.success_count} success, "
-            f"   {self.no_readme_count} no README, "
-            f"❌ {self.failed_count} failed) | "
-            f"Rate: {rate:.1f} jobs/sec"
-        )
-
-
     async def run(self, poll_interval: int = 10, auto_exit: bool = True):
         """
         무한 루프로 job 처리
         """
         self.logger.info(f"[Worker {self.worker_id}] README Worker started. Polling for jobs...")
         
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
+
         consecutive_empty = 0
 
         try:

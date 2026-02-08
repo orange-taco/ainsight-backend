@@ -1,5 +1,6 @@
 import asyncio
 import json
+import signal
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -75,6 +76,7 @@ class ClassifyWorker:
                 f"[worker-{self.worker_id}] [Job {self.current_job_id}] ✅ "
                 f"is_library={result['is_library']}, category={result.get('category', 'N/A')}"
             )
+            self.current_job_id = None
 
         except Exception as e:
             await self._handle_error(job, str(e))
@@ -144,8 +146,12 @@ Rules:
     async def run(self, poll_interval: int = 10, auto_exit: bool = True, startup_wait: int = 5):
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
+
         consecutive_empty = 0
-        startup_grace_period = startup_wait
+        startup_grace_period = -(-startup_wait // poll_interval)
 
         try:
             while not self.shutdown_requested:
