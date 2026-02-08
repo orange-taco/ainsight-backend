@@ -7,7 +7,7 @@ mkdir -p "${LOG_DIR}"
 
 BUILD=""
 if [[ "$1" == "--build" ]]; then
-    BUILD="--build"
+    BUILD="--build --no-cache"
     echo "🔨 Building images..."
 fi
 
