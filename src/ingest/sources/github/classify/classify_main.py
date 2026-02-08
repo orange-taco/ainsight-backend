@@ -12,17 +12,27 @@ from core.logging.logger import get_logger
 logger = get_logger(__name__)
 
 async def init_jobs(db):
+    container = AppContainer()
+    mongo = container.mongo_client()
+    db = mongo[settings.MONGO_DB_NAME]
     jobs_col = db["github_classify_jobs"]
     
-    active_count = await jobs_col.count_documents({"status": {"$in": ["pending", "running"]}})
+    active_count = await jobs_col.count_documents({
+        "status": {"$in": ["pending", "running"]}
+    })
     
     if active_count > 0:
-        logger.info(f"Active jobs exist ({active_count}). Continuing.")
+        logger.info(
+            f"Active jobs exist ({active_count}). Continuing."
+        )
         return
     
     total_count = await jobs_col.count_documents({})
+
     if total_count > 0:
-        logger.info(f"All previous jobs completed ({total_count} total). Creating new jobs...")
+        logger.info(
+            f"All previous jobs completed ({total_count} total). Creating new jobs..."
+        )
     
     inserted = await generate_classify_jobs(db)
     logger.info(f"Created {inserted} classify jobs" if inserted > 0 else "No repos need classification")
@@ -82,6 +92,7 @@ async def run_worker():
 async def main():
     container = AppContainer()
     mongo = container.mongo_client()
+    db = mongo[settings.MONGO_DB_NAME]
 
     logger.info("=" * 60)
     logger.info("GitHub Classify System Starting")
