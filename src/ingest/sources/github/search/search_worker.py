@@ -1,8 +1,6 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
-from pymongo.errors import DuplicateKeyError
-import time
 
 from ingest.sources.github.shared.client import GitHubClient
 from ingest.sources.github.shared.filters import is_valid_repo
@@ -92,13 +90,13 @@ class GitHubJobWorker:
         )
 
         try:
-            # GitHub Search API 호출
-            repos = self.client.search_repositories(query)
+            # GitHub Search API 호출 (blocking → thread로 분리)
+            repos = await asyncio.to_thread(self.client.search_repositories, query)
             total_count = repos.totalCount
             self.logger.info(f"[worker-{self.worker_id}] Found {total_count} repos for query: {query}")
 
             documents = []
-            for repo in repos:
+            for repo in await asyncio.to_thread(list, repos):
                 if not is_valid_repo(repo, min_size=50, min_pushed_at=30):
                     continue
                 
@@ -140,12 +138,13 @@ class GitHubJobWorker:
                 f"[worker-{self.worker_id}] [Job {self.current_job_id}] ✅ Completed successfully "
                 f"({len(documents)} repos collected)"
             )
+            self.current_job_id = None
 
         except GithubException as e:
-            await self._handle_github_error(self.current_job_id, job, e)
+            await self._handle_github_error(job, e)
 
         except Exception as e:
-            await self._handle_generic_error(self.current_job_id, job, e)
+            await self._handle_generic_error(job, e)
 
     async def _handle_github_error(self, job: dict, error: GithubException):
         """
@@ -193,7 +192,7 @@ class GitHubJobWorker:
         # 그 외 GitHub 에러 (404, 422 등)
         error_msg = f"GitHub API error ({error.status}): {error.data.get('message', str(error))}"
         self.logger.error(f"[worker-{self.worker_id}] [Job {self.current_job_id}] {error_msg}")
-        await self._mark_job_failed(self.current_job_id, job, error_msg)
+        await self._mark_job_failed(job, error_msg)
 
     async def _handle_generic_error(self,  job: dict, error: Exception):
         """
@@ -201,7 +200,7 @@ class GitHubJobWorker:
         """
         error_msg = f"Unexpected error: {str(error)}"
         self.logger.error(f"[worker-{self.worker_id}] [Job {self.current_job_id}] {error_msg}", exc_info=True)
-        await self._mark_job_failed(self.current_job_id, job, error_msg)
+        await self._mark_job_failed(job, error_msg)
 
     async def _mark_job_failed(self, job: dict, error_message: str):
         """
@@ -230,13 +229,14 @@ class GitHubJobWorker:
         )
         self.current_job_id = None
 
-    async def run(self, poll_interval: int = 10, auto_exit: bool = True):
+    async def run(self, poll_interval: int = 10, auto_exit: bool = True, startup_wait: int = 5):
         """
         무한 루프로 job 처리 (Docker에서 실행)
         """
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
         consecutive_empty = 0
+        startup_grace_period = -(-startup_wait // poll_interval)
 
         try:
             while not self.shutdown_requested:
@@ -244,10 +244,11 @@ class GitHubJobWorker:
                 
                 if job:
                     consecutive_empty = 0
+                    startup_grace_period = 0  # job 발견하면 grace period 종료
                     await self.process_job(job)
                 else:
                     consecutive_empty += 1
-                    if auto_exit:
+                    if auto_exit and startup_grace_period <= 0:
                         active_count = await self.jobs_col.count_documents({
                             "status": {"$in": ["pending", "running"]}
                         })
@@ -255,7 +256,11 @@ class GitHubJobWorker:
                             self.logger.info(f"[worker-{self.worker_id}] No active jobs. Exiting...")
                             break
                     
-                    if consecutive_empty == 1:
+                    if startup_grace_period > 0:
+                        startup_grace_period -= 1
+                        if consecutive_empty == 1:
+                            self.logger.info(f"[worker-{self.worker_id}] Waiting for job generation... ({startup_grace_period * poll_interval}s grace period remaining)")
+                    elif consecutive_empty == 1:
                         self.logger.info(f"[worker-{self.worker_id}] No pending jobs. Waiting...")
                     elif consecutive_empty % 10 == 0:
                         # 10번마다 한 번씩 로그

@@ -1,5 +1,6 @@
 import asyncio
 import signal
+from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 
 from core.containers.app_containers import AppContainer
@@ -107,6 +108,16 @@ async def run_worker():
     await worker.run(poll_interval=10)
 
 
+async def cleanup_stale_running_jobs(db):
+    jobs_col = db["github_search_jobs"]
+    result = await jobs_col.update_many(
+        {"status": "running"},
+        {"$set": {"status": "pending", "updated_at": datetime.now(timezone.utc)}}
+    )
+    if result.modified_count > 0:
+        logger.info(f"🔧 Restored {result.modified_count} stale running jobs to pending")
+
+
 async def main():
     """메인 진입점"""
     container = AppContainer()
@@ -126,6 +137,9 @@ async def main():
     # MongoDB 연결 테스트
     await mongo.admin.command("ping")
     logger.info("MongoDB connected")
+
+    # Stale running job 복구
+    await cleanup_stale_running_jobs(db)
 
     # Job 초기화
         # Job 초기화 (Worker 1만 실행)

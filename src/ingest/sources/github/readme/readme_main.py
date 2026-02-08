@@ -87,9 +87,12 @@ async def print_job_status(db):
     logger.info("=" * 60)
 
 
+worker_instance = None
+
 async def run_worker():
 
     """Worker 실행"""
+    global worker_instance
     container = AppContainer()
     mongo = container.mongo_client()
     
@@ -99,7 +102,7 @@ async def run_worker():
         worker_id=settings.WORKER_ID,
         total_workers=settings.TOTAL_WORKERS,
     )
-    
+    worker_instance = worker
     await worker.run(poll_interval=10)
 
 async def cleanup_stale_running_jobs(db):
@@ -153,20 +156,23 @@ async def main():
     await init_jobs(db)
     await print_job_status(db)
 
-    loop = asyncio.get_running_loop()
-    worker_task = None 
-
-    # Worker 시작
     logger.info("=" * 60)
     try:
-        await run_worker()  # worker_task 안 만들고 직접 await
+        await run_worker()
     finally:
-        pass  # signal handler 제거할 필요 없음
+        pass
 
 
+def signal_handler(signum, frame):
+    global worker_instance
+    logger.info(f"Received signal {signum}. Initiating graceful shutdown")
+    if worker_instance:
+        worker_instance.shutdown_requested = True
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
