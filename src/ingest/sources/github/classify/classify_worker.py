@@ -1,6 +1,5 @@
 import asyncio
 import json
-import signal
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -146,10 +145,6 @@ Rules:
     async def run(self, poll_interval: int = 10, auto_exit: bool = True, startup_wait: int = 5):
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
-
         consecutive_empty = 0
         startup_grace_period = -(-startup_wait // poll_interval)
 

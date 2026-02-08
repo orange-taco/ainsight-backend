@@ -1,4 +1,5 @@
 import asyncio
+import signal
 from datetime import datetime, timezone
 
 from core.containers.app_containers import AppContainer
@@ -74,7 +75,10 @@ async def cleanup_stale_running_jobs(db):
     if result.modified_count > 0:
         logger.info(f"🔧 Restored {result.modified_count} stale running jobs")
 
+worker_instance = None
+
 async def run_worker():
+    global worker_instance
     container = AppContainer()
     mongo = container.mongo_client()
     
@@ -86,7 +90,7 @@ async def run_worker():
         llm_client=llm_client,
         worker_id=settings.WORKER_ID,
     )
-    
+    worker_instance = worker
     await worker.run(poll_interval=10)
 
 async def main():
@@ -116,7 +120,17 @@ async def main():
     finally:
         pass
 
+
+def signal_handler(signum, frame):
+    global worker_instance
+    logger.info(f"Received signal {signum}. Initiating graceful shutdown")
+    if worker_instance:
+        worker_instance.shutdown_requested = True
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):

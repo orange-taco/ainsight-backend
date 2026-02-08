@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime, timezone
-import signal
 from typing import Optional
 from github import GithubException
 
@@ -83,8 +82,8 @@ class ReadmeWorker:
         
 
         try:
-            # GitHub Core API로 README 가져오기
-            readme_content = self.client.get_readme(full_name)
+            # GitHub Core API로 README 가져오기 (blocking → thread로 분리)
+            readme_content = await asyncio.to_thread(self.client.get_readme, full_name)
             
             if readme_content is None:
                 # README 없음
@@ -241,10 +240,6 @@ class ReadmeWorker:
         """
         self.logger.info(f"[Worker {self.worker_id}] README Worker started. Polling for jobs...")
         
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
-
         consecutive_empty = 0
 
         try:

@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime, timezone
-import signal
 from typing import Optional
 
 from ingest.sources.github.shared.client import GitHubClient
@@ -91,13 +90,13 @@ class GitHubJobWorker:
         )
 
         try:
-            # GitHub Search API 호출
-            repos = self.client.search_repositories(query)
+            # GitHub Search API 호출 (blocking → thread로 분리)
+            repos = await asyncio.to_thread(self.client.search_repositories, query)
             total_count = repos.totalCount
             self.logger.info(f"[worker-{self.worker_id}] Found {total_count} repos for query: {query}")
 
             documents = []
-            for repo in repos:
+            for repo in await asyncio.to_thread(list, repos):
                 if not is_valid_repo(repo, min_size=50, min_pushed_at=30):
                     continue
                 
@@ -236,10 +235,6 @@ class GitHubJobWorker:
         """
         self.logger.info(f"Worker-{self.worker_id} started. Polling for jobs...")
         
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: setattr(self, 'shutdown_requested', True))
-
         consecutive_empty = 0
         startup_grace_period = -(-startup_wait // poll_interval)
 

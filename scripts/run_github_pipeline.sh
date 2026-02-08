@@ -1,14 +1,21 @@
 #!/bin/bash
 set -e
 
+cleanup() {
+    echo "Shutting down workers..."
+    docker-compose rm -f search-worker-1 search-worker-2 readme-worker-1 readme-worker-2 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_DIR="./logs/${TIMESTAMP}"
 mkdir -p "${LOG_DIR}"
 
 BUILD=""
 if [[ "$1" == "--build" ]]; then
-    BUILD="--build --no-cache"
-    echo "🔨 Building images..."
+    BUILD="--build"
+    echo "🔨 Building images (no cache)..."
+    docker-compose build --no-cache
 fi
 
 docker-compose up -d mongo
