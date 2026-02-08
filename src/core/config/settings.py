@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, SecretStr
 from typing import List, Dict
 
 
@@ -30,7 +30,7 @@ class AppSettings(BaseSettings):
     GITHUB_INGEST_PIPELINE_VERSION: str = "github_ingest_v1"
 
     # ===== OpenAI =====
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: SecretStr
 
     # Job Configuration
     GITHUB_INGEST_BUCKET_PREFIX: str = "ml_repos"

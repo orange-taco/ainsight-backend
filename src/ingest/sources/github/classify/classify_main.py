@@ -82,7 +82,6 @@ async def run_worker():
 async def main():
     container = AppContainer()
     mongo = container.mongo_client()
-    db = mongo[settings.MONGO_DB_NAME]
 
     logger.info("=" * 60)
     logger.info("GitHub Classify System Starting")

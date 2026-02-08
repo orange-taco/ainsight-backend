@@ -13,6 +13,6 @@ class AppContainer(containers.DeclarativeContainer):
     
     llm_client = providers.Singleton(
         OpenAIClient,
-        api_key=settings.OPENAI_API_KEY
+        api_key=settings.OPENAI_API_KEY.get_secret_value()
     )
 
